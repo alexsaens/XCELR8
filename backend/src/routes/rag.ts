@@ -6,7 +6,7 @@ import { logAudit } from '../services/bigquery';
 import { v4 as uuidv4 } from 'uuid';
 
 export const ragRoutes = Router();
-const db = admin.firestore();
+const getDb = () => admin.firestore();
 
 /** List RAG repository documents */
 ragRoutes.get(
@@ -15,7 +15,7 @@ ragRoutes.get(
   async (req: AuthenticatedRequest, res) => {
     try {
       const { category, status } = req.query;
-      let query: admin.firestore.Query = db.collection('ragDocuments');
+      let query: admin.firestore.Query = getDb().collection('ragDocuments');
 
       if (category) query = query.where('category', '==', category);
       if (status) query = query.where('status', '==', status);
@@ -67,7 +67,7 @@ ragRoutes.post(
         status: 'processing', // Will be updated by Cloud Function after embedding
       };
 
-      await db.collection('ragDocuments').doc(docId).set(ragDoc);
+      await getDb().collection('ragDocuments').doc(docId).set(ragDoc);
 
       await logAudit({
         actorId: req.user!.uid,
@@ -91,13 +91,13 @@ ragRoutes.delete(
   requireRole('admin'),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const doc = await db.collection('ragDocuments').doc(req.params.id).get();
+      const doc = await getDb().collection('ragDocuments').doc(req.params.id).get();
       if (!doc.exists) {
         res.status(404).json({ error: 'Document not found' });
         return;
       }
 
-      await db.collection('ragDocuments').doc(req.params.id).delete();
+      await getDb().collection('ragDocuments').doc(req.params.id).delete();
 
       await logAudit({
         actorId: req.user!.uid,

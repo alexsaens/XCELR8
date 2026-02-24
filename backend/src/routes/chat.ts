@@ -5,7 +5,7 @@ import { chat as aiChat } from '../services/vertexai';
 import { v4 as uuidv4 } from 'uuid';
 
 export const chatRoutes = Router();
-const db = admin.firestore();
+const getDb = () => admin.firestore();
 
 /** Get chat history for a submission */
 chatRoutes.get(
@@ -13,7 +13,7 @@ chatRoutes.get(
   requireRole('legal', 'admin'),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const doc = await db
+      const doc = await getDb()
         .collection('chatSessions')
         .doc(req.params.submissionId)
         .get();
@@ -43,7 +43,7 @@ chatRoutes.post(
       }
 
       // Get submission context
-      const subDoc = await db
+      const subDoc = await getDb()
         .collection('submissions')
         .doc(req.params.submissionId)
         .get();
@@ -60,7 +60,7 @@ AI Summary: ${submission.aiSummary}
 Risk Factors: ${JSON.stringify(submission.riskFactors)}`;
 
       // Get existing chat history
-      const chatDoc = await db
+      const chatDoc = await getDb()
         .collection('chatSessions')
         .doc(req.params.submissionId)
         .get();
@@ -87,7 +87,7 @@ Risk Factors: ${JSON.stringify(submission.riskFactors)}`;
 
       const updatedMessages = [...existingMessages, userMsg, assistantMsg];
 
-      await db
+      await getDb()
         .collection('chatSessions')
         .doc(req.params.submissionId)
         .set(

@@ -6,13 +6,13 @@ import { logAudit, recordSubmissionAnalytics } from '../services/bigquery';
 import { v4 as uuidv4 } from 'uuid';
 
 export const submissionRoutes = Router();
-const db = admin.firestore();
+const getDb = () => admin.firestore();
 
 /** List submissions (marketers see own, legal/admin see all) */
 submissionRoutes.get('/', async (req: AuthenticatedRequest, res) => {
   try {
     const { status, riskScore, limit: limitStr, offset: offsetStr } = req.query;
-    let query: admin.firestore.Query = db.collection('submissions');
+    let query: admin.firestore.Query = getDb().collection('submissions');
 
     // Marketers only see their own submissions
     if (req.user!.role === 'marketer') {
@@ -43,7 +43,7 @@ submissionRoutes.get('/', async (req: AuthenticatedRequest, res) => {
 /** Get a single submission */
 submissionRoutes.get('/:id', async (req: AuthenticatedRequest, res) => {
   try {
-    const doc = await db.collection('submissions').doc(req.params.id).get();
+    const doc = await getDb().collection('submissions').doc(req.params.id).get();
     if (!doc.exists) {
       res.status(404).json({ error: 'Submission not found' });
       return;
@@ -107,7 +107,7 @@ submissionRoutes.post(
         updatedAt: now,
       };
 
-      await db.collection('submissions').doc(submissionId).set(submission);
+      await getDb().collection('submissions').doc(submissionId).set(submission);
 
       // Audit log
       await logAudit({
@@ -155,7 +155,7 @@ submissionRoutes.patch(
         return;
       }
 
-      await db.collection('submissions').doc(req.params.id).update({
+      await getDb().collection('submissions').doc(req.params.id).update({
         status,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });

@@ -5,12 +5,12 @@ import { logAudit, recordSubmissionAnalytics } from '../services/bigquery';
 import { v4 as uuidv4 } from 'uuid';
 
 export const reviewRoutes = Router();
-const db = admin.firestore();
+const getDb = () => admin.firestore();
 
 /** List reviews for a submission */
 reviewRoutes.get('/submission/:submissionId', async (req: AuthenticatedRequest, res) => {
   try {
-    const snapshot = await db
+    const snapshot = await getDb()
       .collection('reviews')
       .where('submissionId', '==', req.params.submissionId)
       .orderBy('createdAt', 'desc')
@@ -43,7 +43,7 @@ reviewRoutes.post(
       }
 
       // Verify submission exists
-      const subDoc = await db.collection('submissions').doc(submissionId).get();
+      const subDoc = await getDb().collection('submissions').doc(submissionId).get();
       if (!subDoc.exists) {
         res.status(404).json({ error: 'Submission not found' });
         return;
@@ -67,11 +67,11 @@ reviewRoutes.post(
         createdAt: now,
       };
 
-      await db.collection('reviews').doc(reviewId).set(review);
+      await getDb().collection('reviews').doc(reviewId).set(review);
 
       // Update submission status
       const newStatus = decision === 'approved' ? 'approved' : 'revision_needed';
-      await db.collection('submissions').doc(submissionId).update({
+      await getDb().collection('submissions').doc(submissionId).update({
         status: newStatus,
         updatedAt: now,
       });

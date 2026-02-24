@@ -4,7 +4,7 @@ import { AuthenticatedRequest, requireRole } from '../middleware/auth';
 import { logAudit } from '../services/bigquery';
 
 export const adminRoutes = Router();
-const db = admin.firestore();
+const getDb = () => admin.firestore();
 
 /** List all users */
 adminRoutes.get(
@@ -12,7 +12,7 @@ adminRoutes.get(
   requireRole('admin'),
   async (_req: AuthenticatedRequest, res) => {
     try {
-      const snapshot = await db.collection('users').get();
+      const snapshot = await getDb().collection('users').get();
       const users = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -51,7 +51,7 @@ adminRoutes.post(
       });
 
       // Store user profile in Firestore
-      await db.collection('users').doc(userRecord.uid).set({
+      await getDb().collection('users').doc(userRecord.uid).set({
         email,
         name,
         role,
@@ -90,7 +90,7 @@ adminRoutes.patch(
         return;
       }
 
-      await db.collection('users').doc(req.params.uid).update({ role });
+      await getDb().collection('users').doc(req.params.uid).update({ role });
       await admin.auth().setCustomUserClaims(req.params.uid, { role });
 
       await logAudit({
@@ -116,7 +116,7 @@ adminRoutes.delete(
   async (req: AuthenticatedRequest, res) => {
     try {
       await admin.auth().deleteUser(req.params.uid);
-      await db.collection('users').doc(req.params.uid).delete();
+      await getDb().collection('users').doc(req.params.uid).delete();
 
       await logAudit({
         actorId: req.user!.uid,
