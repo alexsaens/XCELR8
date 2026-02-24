@@ -1,24 +1,44 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import type { UserRole } from '../types';
-import { Zap, ArrowLeft } from 'lucide-react';
+import { Zap, ArrowLeft, Loader2 } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
-  const [selectedRole, setSelectedRole] = useState<UserRole>('marketer');
-  const { login } = useAuth();
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { user, login, loginDemo, error } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Redirect when user becomes authenticated
+  useEffect(() => {
+    if (user) {
+      navigate(user.role === 'legal' ? '/legal' : '/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    login(email, selectedRole);
-    if (selectedRole === 'legal') {
-      navigate('/legal');
-    } else if (selectedRole === 'admin') {
-      navigate('/dashboard');
-    } else {
-      navigate('/dashboard');
+    if (!email || !password) return;
+    setIsLoading(true);
+    try {
+      await login(email, password);
+    } catch {
+      // Error displayed from context
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async (role: UserRole) => {
+    setIsLoading(true);
+    try {
+      await loginDemo(role);
+    } catch {
+      // Error displayed from context
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -61,6 +81,12 @@ export default function Login() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -72,6 +98,7 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.ca"
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                disabled={isLoading}
               />
             </div>
 
@@ -81,16 +108,27 @@ export default function Login() {
               </label>
               <input
                 type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                disabled={isLoading}
               />
             </div>
 
             <button
               type="submit"
-              className="w-full py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+              disabled={isLoading || !email || !password}
+              className="w-full py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Sign In
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                'Sign In'
+              )}
             </button>
           </form>
 
@@ -102,17 +140,9 @@ export default function Login() {
               {demoAccounts.map((account) => (
                 <button
                   key={account.role}
-                  onClick={() => {
-                    setEmail(account.email);
-                    setSelectedRole(account.role);
-                    login(account.email, account.role);
-                    if (account.role === 'legal') {
-                      navigate('/legal');
-                    } else {
-                      navigate('/dashboard');
-                    }
-                  }}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all text-left"
+                  disabled={isLoading}
+                  onClick={() => handleDemoLogin(account.role)}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-sm font-semibold shrink-0">
                     {account.name

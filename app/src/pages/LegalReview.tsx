@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { mockSubmissions, mockPrecedents, mockChatMessages } from '../lib/mockData';
 import {
@@ -6,6 +6,7 @@ import {
   RISK_LABELS,
   type ChatMessage,
 } from '../types';
+import { api } from '../lib/api';
 import {
   ArrowLeft,
   FileText,
@@ -47,25 +48,49 @@ export default function LegalReview() {
     );
   }
 
-  const handleSendMessage = () => {
-    if (!chatInput.trim()) return;
+  const handleSendMessage = useCallback(async () => {
+    if (!chatInput.trim() || !id) return;
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
       role: 'user',
       content: chatInput,
       timestamp: new Date(),
     };
+    setMessages((prev) => [...prev, userMsg]);
+    const question = chatInput;
+    setChatInput('');
+
+    try {
+      const result = await api.chat.send(id, question);
+      const reply = (result as { reply?: string }).reply;
+      if (reply) {
+        setMessages((prev) => [
+          ...prev,
+          { id: `msg-${Date.now()}`, role: 'assistant', content: reply, timestamp: new Date() },
+        ]);
+        return;
+      }
+    } catch {
+      // API unavailable — use mock response
+    }
+
     const aiMsg: ChatMessage = {
       id: `msg-${Date.now() + 1}`,
       role: 'assistant',
-      content: `Based on my analysis of the submission, here's what I found regarding your question about "${chatInput}":\n\nThe content relates to ${CONTENT_TYPE_LABELS[submission.contentType]} and has been flagged with ${submission.riskFactors.length} risk factor(s). I recommend reviewing the specific regulatory requirements under ${submission.riskFactors.map((r) => r.regulation).join(', ') || 'applicable Canadian regulations'} before making a determination.`,
+      content: `Based on my analysis of the submission, here's what I found regarding your question about "${question}":\n\nThe content relates to ${CONTENT_TYPE_LABELS[submission.contentType]} and has been flagged with ${submission.riskFactors.length} risk factor(s). I recommend reviewing the specific regulatory requirements under ${submission.riskFactors.map((r) => r.regulation).join(', ') || 'applicable Canadian regulations'} before making a determination.`,
       timestamp: new Date(),
     };
-    setMessages((prev) => [...prev, userMsg, aiMsg]);
-    setChatInput('');
-  };
+    setMessages((prev) => [...prev, aiMsg]);
+  }, [chatInput, id, submission]);
 
-  const handleAction = (action: string) => {
+  const handleAction = async (action: string) => {
+    if (!id) return;
+    const decision = action === 'approve' ? 'approved' : action === 'revision' ? 'revision_needed' : 'escalated';
+    try {
+      await api.reviews.create({ submissionId: id, decision });
+    } catch {
+      // API unavailable — proceed with UI transition for demo
+    }
     setActiveAction(action);
     setTimeout(() => {
       navigate('/legal');
