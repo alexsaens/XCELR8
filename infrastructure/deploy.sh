@@ -4,6 +4,7 @@ set -e
 # ============================================================
 # XCELR8 — Full GCP Deployment Script
 # Project: cs-poc-rlwc9pihxctoazqsylrl3ka (640454986584)
+# Firebase App ID: 1:640454986584:web:0a55842b383fd777a5732d
 # Budget: < $30 USD
 # ============================================================
 
@@ -31,12 +32,13 @@ gcloud services enable \
   bigquery.googleapis.com \
   storage.googleapis.com \
   aiplatform.googleapis.com \
+  identitytoolkit.googleapis.com \
   --project=$PROJECT_ID
 
 echo "APIs enabled."
 
 # --------------------------------------------------------
-# Step 1: Set up Firebase
+# Step 1: Set up Firebase + Authentication
 # --------------------------------------------------------
 echo ""
 echo ">>> Step 1: Setting up Firebase..."
@@ -49,14 +51,12 @@ gcloud firestore databases create \
   --location=nam5 \
   --project=$PROJECT_ID 2>/dev/null || echo "Firestore database already exists."
 
-# Create a Firebase web app and get config
 echo ""
-echo ">>> Creating Firebase web app..."
-firebase apps:create WEB "XCELR8" --project=$PROJECT_ID 2>/dev/null || echo "Web app may already exist."
-
+echo ">>> Firebase Authentication: Email/Password provider must be enabled manually."
+echo "    Go to: https://console.firebase.google.com/project/$PROJECT_ID/authentication/providers"
+echo "    Enable 'Email/Password' sign-in method."
 echo ""
-echo ">>> Getting Firebase config (you'll need this for the frontend .env)..."
-firebase apps:sdkconfig WEB --project=$PROJECT_ID
+read -p "Press Enter once Email/Password auth is enabled..."
 
 # Deploy Firestore rules and indexes
 echo ""
@@ -70,6 +70,11 @@ echo ""
 echo ">>> Step 2: Creating Cloud Storage bucket..."
 gsutil mb -p $PROJECT_ID -l US gs://${PROJECT_ID}-xcelr8-uploads 2>/dev/null || echo "Bucket already exists."
 gsutil uniformbucketlevelaccess set on gs://${PROJECT_ID}-xcelr8-uploads
+
+# CORS policy for signed URL uploads from the browser
+echo '[{"origin": ["*"], "method": ["GET", "PUT"], "responseHeader": ["Content-Type"], "maxAgeSeconds": 3600}]' > /tmp/cors.json
+gsutil cors set /tmp/cors.json gs://${PROJECT_ID}-xcelr8-uploads
+rm /tmp/cors.json
 
 # --------------------------------------------------------
 # Step 3: Set up BigQuery dataset and tables
@@ -137,6 +142,16 @@ cd ..
 firebase deploy --only hosting --project=$PROJECT_ID
 
 HOSTING_URL="https://${PROJECT_ID}.web.app"
+
+# --------------------------------------------------------
+# Step 7: Seed demo users
+# --------------------------------------------------------
+echo ""
+echo ">>> Step 7: Seeding demo users..."
+echo "    Running: node infrastructure/seed-admin.js"
+echo ""
+node infrastructure/seed-admin.js || echo "User seeding failed — you can retry manually later."
+
 echo ""
 echo "========================================"
 echo "DEPLOYMENT COMPLETE!"
@@ -145,15 +160,10 @@ echo ""
 echo "Frontend:  $HOSTING_URL"
 echo "Backend:   $BACKEND_URL"
 echo ""
-echo "Next steps:"
-echo "  1. Go to Firebase Console > Authentication > Sign-in method"
-echo "     Enable 'Email/Password' provider"
+echo "Demo accounts:"
+echo "  Marketer: sarah.chen@acmefinancial.ca / Xcelr8Mkt2026!"
+echo "  Legal:    priya.sharma@acmefinancial.ca / Xcelr8Legal2026!"
+echo "  Admin:    admin@acmefinancial.ca / Xcelr8Admin2026!"
 echo ""
-echo "  2. Create the first admin user:"
-echo "     Go to Firebase Console > Authentication > Add user"
-echo "     Email: admin@acmefinancial.ca"
-echo "     Then run:"
-echo "     node -e \"const admin = require('firebase-admin'); admin.initializeApp({projectId:'$PROJECT_ID'}); admin.firestore().collection('users').doc('<UID>').set({email:'admin@acmefinancial.ca',name:'Admin',role:'admin',createdAt:new Date()});\""
-echo ""
-echo "  3. Visit $HOSTING_URL and sign in!"
+echo "Visit $HOSTING_URL and sign in!"
 echo "========================================"
