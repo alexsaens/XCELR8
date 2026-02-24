@@ -1,0 +1,21 @@
+{
+  "name": "xcelr8-functions",
+  "version": "1.0.0",
+  "description": "XCELR8 Cloud Functions — AI processing pipeline",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "deploy": "firebase deploy --only functions"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "@google-cloud/vertexai": "^1.9.0",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^5.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

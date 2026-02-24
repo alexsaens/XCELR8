@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: check if user is authenticated
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Helper: get user role from the users collection
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isAuth() && getUserRole() == 'admin';
+    }
+
+    function isLegal() {
+      return isAuth() && getUserRole() == 'legal';
+    }
+
+    function isMarketer() {
+      return isAuth() && getUserRole() == 'marketer';
+    }
+
+    // Users collection: admins can read/write, users can read own profile
+    match /users/{userId} {
+      allow read: if isAuth() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // Submissions: marketers create + read own, legal/admin read all
+    match /submissions/{submissionId} {
+      allow create: if isAuth() && (isMarketer() || isAdmin());
+      allow read: if isAuth() && (
+        resource.data.submittedBy == request.auth.uid ||
+        isLegal() ||
+        isAdmin()
+      );
+      allow update: if isAuth() && (isLegal() || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Reviews: legal creates, all authenticated can read
+    match /reviews/{reviewId} {
+      allow create: if isAuth() && (isLegal() || isAdmin());
+      allow read: if isAuth();
+      allow update, delete: if isAdmin();
+    }
+
+    // Chat sessions: legal/admin can read and write
+    match /chatSessions/{sessionId} {
+      allow read, write: if isAuth() && (isLegal() || isAdmin());
+    }
+
+    // RAG documents: admin manages, legal can read
+    match /ragDocuments/{docId} {
+      allow read: if isAuth() && (isLegal() || isAdmin());
+      allow write: if isAdmin();
+    }
+  }
+}
